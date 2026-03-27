@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { ClerkProvider } from "@clerk/nextjs";
 import { Inter } from "next/font/google";
 import { Toaster } from "@/components/ui/sonner";
+import { npDebug } from "@/lib/netpulse-runtime-debug";
 import { getSiteUrl } from "@/lib/site-url";
 import { cn } from "@/lib/utils";
 import "./globals.css";
@@ -12,6 +13,42 @@ const inter = Inter({
 });
 
 const site = getSiteUrl();
+const explicitSite = process.env.NEXT_PUBLIC_SITE_URL?.trim();
+// #region agent log
+try {
+  new URL(site);
+  npDebug("H1", "app/layout.tsx:metadata-eval", {
+    metadataBaseParseOk: true,
+    explicitLen: explicitSite?.length ?? 0,
+    explicitHasProtocol: explicitSite
+      ? /^https?:\/\//i.test(explicitSite)
+      : false,
+    computedSiteLen: site.length,
+    hasVercelUrl: Boolean(process.env.VERCEL_URL),
+    hasClerkPk: Boolean(
+      process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY?.trim()
+    ),
+    hasClerkSecret: Boolean(process.env.CLERK_SECRET_KEY?.trim()),
+  });
+} catch (e) {
+  npDebug("H1", "app/layout.tsx:metadata-eval", {
+    metadataBaseParseOk: false,
+    errorName: e instanceof Error ? e.name : "unknown",
+    explicitLen: explicitSite?.length ?? 0,
+    explicitHasProtocol: explicitSite
+      ? /^https?:\/\//i.test(explicitSite)
+      : false,
+    computedSiteLen: site.length,
+    sitePrefix: site.slice(0, 24),
+    hasVercelUrl: Boolean(process.env.VERCEL_URL),
+    hasClerkPk: Boolean(
+      process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY?.trim()
+    ),
+    hasClerkSecret: Boolean(process.env.CLERK_SECRET_KEY?.trim()),
+  });
+  throw e;
+}
+// #endregion
 
 export const metadata: Metadata = {
   metadataBase: new URL(site),
