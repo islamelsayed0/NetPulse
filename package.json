@@ -6,8 +6,11 @@
     "node": ">=22.0.0 <25.0.0"
   },
   "scripts": {
+    "clean": "node -e \"const fs=require('fs');try{fs.rmSync('.next',{recursive:true,force:true})}catch(e){if(e.code!=='ENOENT')throw e}\"",
     "dev": "next dev",
+    "dev:clean": "npm run clean && next dev",
     "build": "next build",
+    "prestart": "node ./scripts/prestart-check.mjs",
     "start": "next start",
     "lint": "next lint"
   },

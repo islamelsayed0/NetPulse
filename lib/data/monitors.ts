@@ -3,7 +3,11 @@ import {
   type Monitor,
   type MonitorCheck,
 } from "@/lib/supabase";
-import type { MonitorListItem, MonitorRow } from "@/lib/dashboard-types";
+import type {
+  MonitorHealth,
+  MonitorListItem,
+  MonitorRow,
+} from "@/lib/dashboard-types";
 import { INPUT_LIMITS } from "@/lib/constants";
 import {
   sanitizeMonitorName,
@@ -36,11 +40,13 @@ function normalizeMonitorUrl(raw: string): string {
   return `https://${t}`;
 }
 
-function dbStatusToHealth(
-  status: string | null
-): "operational" | "down" | "degraded" {
-  if (status === "operational") return "operational";
+function dbStatusToHealth(status: string | null): MonitorHealth {
+  if (status === "operational" || status === "up") return "operational";
   if (status === "down") return "down";
+  if (status === "degraded") return "degraded";
+  if (status === "pending" || status === null || status === "") {
+    return "pending";
+  }
   return "degraded";
 }
 
@@ -87,6 +93,27 @@ export async function getMonitorsForUser(userId: string): Promise<Monitor[]> {
     const e = normalizeSupabaseError(error);
     const detail = formatSupabaseError(e);
     const shown = detail || e.message || "Unknown database error";
+    // #region agent log
+    fetch("http://127.0.0.1:7838/ingest/1763dc2b-6641-47a8-a74d-209daff78414", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Debug-Session-Id": "d60220",
+      },
+      body: JSON.stringify({
+        sessionId: "d60220",
+        runId: "pre-fix",
+        hypothesisId: "H1-H2",
+        location: "lib/data/monitors.ts:getMonitorsForUser",
+        message: "supabase monitors query error",
+        data: {
+          code: e.code ?? null,
+          messagePrefix: (e.message ?? "").slice(0, 80),
+        },
+        timestamp: Date.now(),
+      }),
+    }).catch(() => {});
+    // #endregion
     if (!isPgrstSchemaMissingError(e)) {
       console.error("getMonitorsForUser", shown);
     }
@@ -94,7 +121,49 @@ export async function getMonitorsForUser(userId: string): Promise<Monitor[]> {
       `Failed to load monitors: ${shown}${missingTablesHint(e)}`
     );
   }
+  // #region agent log
+  fetch("http://127.0.0.1:7838/ingest/1763dc2b-6641-47a8-a74d-209daff78414", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "X-Debug-Session-Id": "d60220",
+    },
+    body: JSON.stringify({
+      sessionId: "d60220",
+      runId: "pre-fix",
+      hypothesisId: "H3",
+      location: "lib/data/monitors.ts:getMonitorsForUser",
+      message: "supabase monitors query ok",
+      data: { rowCount: (data ?? []).length },
+      timestamp: Date.now(),
+    }),
+  }).catch(() => {});
+  // #endregion
   return (data ?? []) as Monitor[];
+}
+
+export async function getMonitorForUserById(
+  userId: string,
+  monitorId: string
+): Promise<Monitor | null> {
+  const supabase = createAdminSupabaseClient();
+  const { data, error } = await supabase
+    .from("monitors")
+    .select("*")
+    .eq("id", monitorId)
+    .eq("user_id", userId)
+    .maybeSingle();
+  if (error) {
+    const e = normalizeSupabaseError(error);
+    if (!isPgrstSchemaMissingError(e)) {
+      console.error(
+        "getMonitorForUserById",
+        formatSupabaseError(e) || e.message
+      );
+    }
+    return null;
+  }
+  return (data as Monitor) ?? null;
 }
 
 export async function insertMonitor(

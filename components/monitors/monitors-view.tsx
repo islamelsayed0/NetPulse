@@ -113,8 +113,15 @@ function StatusBadge({ status }: { status: MonitorHealth }) {
     operational: "border-[#3fb950]/40 bg-[#3fb950]/15 text-[#3fb950]",
     degraded: "border-[#f0b429]/40 bg-[#f0b429]/15 text-[#f0b429]",
     down: "border-[#f85149]/40 bg-[#f85149]/15 text-[#f85149]",
+    pending:
+      "border-[#484f58]/60 bg-[#21262d]/80 text-[#8b949e]",
   } as const;
-  const labels = { operational: "Operational", degraded: "Degraded", down: "Down" };
+  const labels = {
+    operational: "Operational",
+    degraded: "Degraded",
+    down: "Down",
+    pending: "Pending",
+  };
   return (
     <span
       className={cn(
@@ -352,6 +359,7 @@ export function MonitorsView({
         setAddOpen(false);
         resetForm();
         router.refresh();
+        toast.success("Monitor created and checked.");
       } catch (err) {
         setFormError(
           err instanceof Error ? err.message : "Could not create monitor"
@@ -449,6 +457,7 @@ export function MonitorsView({
     { id: "operational", label: "Up" },
     { id: "down", label: "Down" },
     { id: "degraded", label: "Degraded" },
+    { id: "pending", label: "Pending" },
   ];
 
   const formFields = (
@@ -686,7 +695,8 @@ export function MonitorsView({
                             "mt-1.5 size-2.5 shrink-0 rounded-full sm:mt-0 animate-np-pulse-dot",
                             m.status === "operational" && "bg-[#3fb950]",
                             m.status === "degraded" && "bg-[#f0b429]",
-                            m.status === "down" && "bg-[#f85149]"
+                            m.status === "down" && "bg-[#f85149]",
+                            m.status === "pending" && "bg-[#484f58]"
                           )}
                           aria-hidden
                         />

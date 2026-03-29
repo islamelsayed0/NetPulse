@@ -1,5 +1,4 @@
 import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
-import { npDebug } from "@/lib/netpulse-runtime-debug";
 
 const isProtectedRoute = createRouteMatcher([
   "/dashboard(.*)",
@@ -7,22 +6,26 @@ const isProtectedRoute = createRouteMatcher([
 ]);
 
 export default clerkMiddleware(async (auth, req) => {
-  try {
-    if (isProtectedRoute(req)) {
-      await auth.protect();
-    }
-  } catch (e) {
+  if (isProtectedRoute(req)) {
     // #region agent log
-    npDebug("H3", "proxy.ts:auth.protect", {
-      pathname: req.nextUrl.pathname,
-      errName: e instanceof Error ? e.name : "unknown",
-      hasClerkPk: Boolean(
-        process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY?.trim()
-      ),
-      hasClerkSecret: Boolean(process.env.CLERK_SECRET_KEY?.trim()),
-    });
+    fetch("http://127.0.0.1:7838/ingest/1763dc2b-6641-47a8-a74d-209daff78414", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Debug-Session-Id": "d60220",
+      },
+      body: JSON.stringify({
+        sessionId: "d60220",
+        runId: "pre-fix",
+        hypothesisId: "H4",
+        location: "proxy.ts:protect",
+        message: "middleware protect branch",
+        data: { pathname: req.nextUrl.pathname },
+        timestamp: Date.now(),
+      }),
+    }).catch(() => {});
     // #endregion
-    throw e;
+    await auth.protect();
   }
 });
 

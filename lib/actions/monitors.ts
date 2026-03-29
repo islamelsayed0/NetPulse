@@ -1,8 +1,10 @@
 "use server";
 
 import { auth } from "@clerk/nextjs/server";
+import { revalidatePath } from "next/cache";
 import {
   deleteMonitorForUser,
+  getMonitorForUserById,
   getMonitorsForUser,
   getUptimeSeriesForUser as loadUptimeSeriesForUser,
   insertMonitor,
@@ -12,6 +14,8 @@ import {
   type UpdateMonitorInput,
   type UpdateMonitorResult,
 } from "@/lib/data/monitors";
+import { runChecksForMonitors } from "@/lib/monitoring/run-all-checks";
+import type { Monitor } from "@/lib/supabase";
 
 async function requireMatchingUserId(userId: string): Promise<string> {
   const { userId: authId } = await auth();
@@ -34,9 +38,20 @@ export async function getUptimeSeriesForUser(userId: string) {
 export async function createMonitor(
   userId: string,
   data: CreateMonitorInput
-) {
+): Promise<Monitor> {
   await requireMatchingUserId(userId);
-  return insertMonitor(userId, data);
+  const monitor = await insertMonitor(userId, data);
+  if (monitor.paused !== true) {
+    try {
+      await runChecksForMonitors([monitor]);
+    } catch (e) {
+      console.error("[NetPulse] initial check after createMonitor failed", e);
+    }
+  }
+  revalidatePath("/dashboard");
+  revalidatePath("/dashboard/monitors");
+  const fresh = await getMonitorForUserById(userId, monitor.id);
+  return fresh ?? monitor;
 }
 
 export async function deleteMonitor(id: string): Promise<void> {

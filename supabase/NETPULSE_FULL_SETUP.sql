@@ -3,7 +3,7 @@
 -- =============================================================================
 -- Paste this entire file into: Supabase Dashboard → SQL Editor → New query → Run
 --
--- Order matches supabase/migrations/001 … 006. Safe to re-run: uses IF NOT EXISTS
+-- Order matches supabase/migrations/001 … 008. Safe to re-run: uses IF NOT EXISTS
 -- and idempotent patterns where the original migrations did.
 --
 -- After success: Settings (Discord/email), monitors (notification_email, pause),
@@ -203,6 +203,119 @@ CREATE POLICY "netpulse_anon_all_user_settings"
 ALTER TABLE user_settings ADD COLUMN IF NOT EXISTS discord_webhook text;
 
 ALTER TABLE user_settings DROP COLUMN IF EXISTS slack_webhook;
+
+-- -----------------------------------------------------------------------------
+-- 007_status_page_rollups.sql
+-- -----------------------------------------------------------------------------
+-- Public status page: daily rollup RPC + latest check stats (service_role only).
+
+CREATE OR REPLACE FUNCTION public.get_status_page_daily_rollups()
+RETURNS TABLE (
+  monitor_id uuid,
+  day_date date,
+  day_status text
+)
+LANGUAGE sql
+STABLE
+SECURITY INVOKER
+SET search_path = public
+AS $$
+  SELECT
+    mc.monitor_id,
+    (mc.checked_at AT TIME ZONE 'UTC')::date AS day_date,
+    CASE
+      WHEN bool_or(mc.status = 'down') THEN 'down'
+      WHEN bool_or(mc.status = 'degraded') THEN 'degraded'
+      WHEN bool_or(mc.status IN ('up', 'operational')) THEN 'up'
+      ELSE 'none'
+    END AS day_status
+  FROM public.monitor_checks mc
+  WHERE (mc.checked_at AT TIME ZONE 'UTC')::date
+      >= ((timezone('UTC', now()))::date - interval '89 days')
+    AND (mc.checked_at AT TIME ZONE 'UTC')::date
+      <= (timezone('UTC', now()))::date
+  GROUP BY mc.monitor_id, (mc.checked_at AT TIME ZONE 'UTC')::date;
+$$;
+
+CREATE OR REPLACE FUNCTION public.get_monitor_latest_check_stats()
+RETURNS TABLE (
+  monitor_id uuid,
+  response_time integer,
+  checked_at timestamptz
+)
+LANGUAGE sql
+STABLE
+SECURITY INVOKER
+SET search_path = public
+AS $$
+  SELECT DISTINCT ON (monitor_id)
+    monitor_id,
+    response_time,
+    checked_at
+  FROM public.monitor_checks
+  ORDER BY monitor_id, checked_at DESC NULLS LAST;
+$$;
+
+REVOKE ALL ON FUNCTION public.get_status_page_daily_rollups() FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.get_status_page_daily_rollups() TO service_role;
+
+REVOKE ALL ON FUNCTION public.get_monitor_latest_check_stats() FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.get_monitor_latest_check_stats() TO service_role;
+
+-- -----------------------------------------------------------------------------
+-- 008_platform_status.sql
+-- -----------------------------------------------------------------------------
+-- Product status page (not tenant monitors): daily samples + platform incidents.
+
+CREATE TABLE IF NOT EXISTS public.platform_health_daily (
+  service_key text NOT NULL,
+  day_utc date NOT NULL,
+  status text NOT NULL CHECK (status IN ('up', 'degraded', 'down')),
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (service_key, day_utc)
+);
+
+CREATE INDEX IF NOT EXISTS platform_health_daily_day_idx
+  ON public.platform_health_daily (day_utc DESC);
+
+CREATE TABLE IF NOT EXISTS public.platform_incidents (
+  id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  title text NOT NULL,
+  severity text NOT NULL DEFAULT 'warning',
+  started_at timestamptz NOT NULL DEFAULT now(),
+  resolved_at timestamptz,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS platform_incidents_resolved_at_idx
+  ON public.platform_incidents (resolved_at DESC NULLS LAST)
+  WHERE resolved_at IS NOT NULL;
+
+ALTER TABLE public.platform_health_daily ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.platform_incidents ENABLE ROW LEVEL SECURITY;
+
+CREATE OR REPLACE FUNCTION public.get_platform_status_heatmap_rollups()
+RETURNS TABLE (
+  service_key text,
+  day_date date,
+  day_status text
+)
+LANGUAGE sql
+STABLE
+SECURITY INVOKER
+SET search_path = public
+AS $$
+  SELECT
+    h.service_key,
+    h.day_utc AS day_date,
+    h.status AS day_status
+  FROM public.platform_health_daily h
+  WHERE h.day_utc >= ((timezone('UTC', now()))::date - interval '89 days')
+    AND h.day_utc <= (timezone('UTC', now()))::date;
+$$;
+
+REVOKE ALL ON FUNCTION public.get_platform_status_heatmap_rollups() FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.get_platform_status_heatmap_rollups() TO service_role;
 
 -- =============================================================================
 -- End of NetPulse full setup

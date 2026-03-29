@@ -51,8 +51,12 @@ export async function POST(request: Request) {
     return applyApiCors(request, res);
   }
 
+  const auth = request.headers.get("authorization");
+  const bearer =
+    auth?.toLowerCase().startsWith("bearer ") ? auth.slice(7).trim() : null;
   const headerSecret = request.headers.get("x-cron-secret")?.trim();
-  if (!headerSecret || headerSecret !== cronSecret) {
+  const authorized = bearer === cronSecret || headerSecret === cronSecret;
+  if (!authorized) {
     const res = NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     return applyApiCors(request, res);
   }

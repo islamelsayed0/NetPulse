@@ -1,4 +1,9 @@
-export type MonitorHealth = "operational" | "down" | "degraded";
+export type MonitorHealth =
+  | "operational"
+  | "down"
+  | "degraded"
+  /** Row inserted; no successful check yet (`monitors.status` = pending). */
+  | "pending";
 
 export type MonitorRow = {
   id: string;

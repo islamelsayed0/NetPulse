@@ -98,6 +98,11 @@ function StatusBadge({ status }: { status: MonitorHealth }) {
       className: "bg-carbon-warning/15 text-carbon-warning",
     },
     down: { label: "Down", className: "bg-carbon-danger/15 text-carbon-danger" },
+    pending: {
+      label: "Pending",
+      className:
+        "border border-carbon-border/80 bg-carbon-border/20 text-carbon-muted",
+    },
   } as const;
   const s = map[status];
   return (
@@ -201,7 +206,7 @@ export function DashboardView({
         setDialogOpen(false);
         resetForm();
         router.refresh();
-        toast.success("Monitor created.");
+        toast.success("Monitor created and checked.");
       } catch (err) {
         setFormError(
           err instanceof Error ? err.message : "Could not create monitor"
@@ -401,7 +406,8 @@ export function DashboardView({
                               "inline-block size-2.5 shrink-0 rounded-full",
                               m.status === "operational" && "bg-carbon-success",
                               m.status === "degraded" && "bg-carbon-warning",
-                              m.status === "down" && "bg-carbon-danger"
+                              m.status === "down" && "bg-carbon-danger",
+                              m.status === "pending" && "bg-carbon-muted"
                             )}
                             aria-hidden
                           />
@@ -467,7 +473,8 @@ export function DashboardView({
                               "inline-block size-2.5 rounded-full",
                               m.status === "operational" && "bg-carbon-success",
                               m.status === "degraded" && "bg-carbon-warning",
-                              m.status === "down" && "bg-carbon-danger"
+                              m.status === "down" && "bg-carbon-danger",
+                              m.status === "pending" && "bg-carbon-muted"
                             )}
                             title={m.status}
                             aria-hidden

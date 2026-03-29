@@ -1,3 +1,13 @@
 {
-  "name": "netpulse"
+  "name": "netpulse",
+  "crons": [
+    {
+      "path": "/api/check-monitors",
+      "schedule": "* * * * *"
+    },
+    {
+      "path": "/api/cron/platform-health-snapshot",
+      "schedule": "0 * * * *"
+    }
+  ]
 }
