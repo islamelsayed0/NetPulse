@@ -119,7 +119,8 @@ export async function upsertUserSettings(
     firstErr.message?.includes("discord_webhook") &&
     Object.prototype.hasOwnProperty.call(merged, "discord_webhook")
   ) {
-    const { discord_webhook: _, ...rest } = merged;
+    const { discord_webhook, ...rest } = merged;
+    void discord_webhook;
     const r2 = await supabase
       .from("user_settings")
       .upsert(rest, { onConflict: "user_id" })

@@ -48,8 +48,10 @@ export function DashboardLayoutClient({
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
 
+  // Post-mount read avoids SSR/client HTML mismatch for sidebar preference.
   useEffect(() => {
     try {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- hydrate from localStorage after mount
       setCollapsed(
         localStorage.getItem(STORAGE_KEYS.sidebarCollapsed) === "1"
       );
@@ -68,6 +70,7 @@ export function DashboardLayoutClient({
   }, []);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- close drawer on client navigations (e.g. back/forward)
     setMobileOpen(false);
   }, [pathname]);
 

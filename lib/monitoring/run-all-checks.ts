@@ -144,12 +144,7 @@ async function persistOneCheck(
   }
 
   try {
-    await updateMonitorStatus(
-      m.id,
-      checkStatus,
-      probe.responseTime,
-      probe.statusCode
-    );
+    await updateMonitorStatus(m.id, checkStatus);
     await refreshMonitorUptimePercentage(m.id);
   } catch (e) {
     console.error(`[NetPulse] monitor update failed: ${m.name}`, e);

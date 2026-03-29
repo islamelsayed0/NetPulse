@@ -93,27 +93,6 @@ export async function getMonitorsForUser(userId: string): Promise<Monitor[]> {
     const e = normalizeSupabaseError(error);
     const detail = formatSupabaseError(e);
     const shown = detail || e.message || "Unknown database error";
-    // #region agent log
-    fetch("http://127.0.0.1:7838/ingest/1763dc2b-6641-47a8-a74d-209daff78414", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-Debug-Session-Id": "d60220",
-      },
-      body: JSON.stringify({
-        sessionId: "d60220",
-        runId: "pre-fix",
-        hypothesisId: "H1-H2",
-        location: "lib/data/monitors.ts:getMonitorsForUser",
-        message: "supabase monitors query error",
-        data: {
-          code: e.code ?? null,
-          messagePrefix: (e.message ?? "").slice(0, 80),
-        },
-        timestamp: Date.now(),
-      }),
-    }).catch(() => {});
-    // #endregion
     if (!isPgrstSchemaMissingError(e)) {
       console.error("getMonitorsForUser", shown);
     }
@@ -121,24 +100,6 @@ export async function getMonitorsForUser(userId: string): Promise<Monitor[]> {
       `Failed to load monitors: ${shown}${missingTablesHint(e)}`
     );
   }
-  // #region agent log
-  fetch("http://127.0.0.1:7838/ingest/1763dc2b-6641-47a8-a74d-209daff78414", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "X-Debug-Session-Id": "d60220",
-    },
-    body: JSON.stringify({
-      sessionId: "d60220",
-      runId: "pre-fix",
-      hypothesisId: "H3",
-      location: "lib/data/monitors.ts:getMonitorsForUser",
-      message: "supabase monitors query ok",
-      data: { rowCount: (data ?? []).length },
-      timestamp: Date.now(),
-    }),
-  }).catch(() => {});
-  // #endregion
   return (data ?? []) as Monitor[];
 }
 
@@ -206,7 +167,8 @@ export async function insertMonitor(
     insertErr.message?.includes("notification_email") &&
     ne
   ) {
-    const { notification_email: _, ...rest } = insertRow;
+    const { notification_email, ...rest } = insertRow;
+    void notification_email;
     const r2 = await supabase.from("monitors").insert(rest).select().single();
     if (!r2.error && r2.data) {
       console.error(
@@ -259,9 +221,7 @@ export async function deleteMonitorForUser(
 
 export async function updateMonitorStatus(
   id: string,
-  status: string,
-  _responseTime: number | null,
-  _statusCode: number | null
+  status: string
 ): Promise<void> {
   const supabase = createAdminSupabaseClient();
   const monitorStatus =
@@ -505,7 +465,8 @@ export async function updateMonitorForUser(
     firstErr.message?.includes("notification_email") &&
     "notification_email" in updates
   ) {
-    const { notification_email: _, ...rest } = updates;
+    const { notification_email, ...rest } = updates;
+    void notification_email;
     if (Object.keys(rest).length > 0) {
       const { error: err2 } = await supabase
         .from("monitors")

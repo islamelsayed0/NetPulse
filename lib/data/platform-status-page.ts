@@ -162,7 +162,37 @@ export async function loadPlatformStatusPageData(): Promise<PlatformStatusPageDa
   const byKey = checksByKey(checkResults);
   const rollupMap = new Map<PlatformServiceKey, Map<string, HeatmapDayStatus>>();
 
-  const supabase = createAdminSupabaseClient();
+  let supabase;
+  try {
+    supabase = createAdminSupabaseClient();
+  } catch {
+    const overall = computeOverall(checkResults.map((c) => c.status));
+    const services: PlatformStatusService[] = PLATFORM_SERVICE_KEYS.map((key) => {
+      const r = byKey.get(key)!;
+      const liveH = liveToHeatmapStatus(r.status);
+      const heatmapDays = buildUtcHeatmapDays(new Map(), liveH);
+      return {
+        key,
+        name: SERVICE_META[key].name,
+        status: r.status,
+        badgeLabel: badgeFor(r.status),
+        latencyMs: r.latencyMs,
+        checkedAtIso: r.checkedAtIso,
+        uptimePct: uptimeFromHeatmap(heatmapDays),
+        heatmapDays,
+        detail: r.detail,
+      };
+    });
+    return {
+      generatedAtIso,
+      overall,
+      services,
+      incidents: [],
+      loadError:
+        "Platform history is unavailable (Supabase URL or service key not configured).",
+    };
+  }
+
   const { data: rollupData, error: rollupErr } = await supabase.rpc(
     "get_platform_status_heatmap_rollups"
   );

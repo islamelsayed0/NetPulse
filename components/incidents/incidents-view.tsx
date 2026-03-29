@@ -244,9 +244,7 @@ export function IncidentsView({
   );
   const [formError, setFormError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
-  const [filterTab, setFilterTab] = useState<
-    "all" | "active" | "resolved" | "critical" | "warning"
-  >("all");
+  const [filterTab, setFilterTab] = useState<FilterTab>("all");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);

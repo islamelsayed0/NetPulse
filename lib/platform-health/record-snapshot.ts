@@ -15,7 +15,12 @@ export async function recordPlatformHealthDaily(
   results: PlatformCheckResult[]
 ): Promise<void> {
   const dayUtc = utcTodayString();
-  const supabase = createAdminSupabaseClient();
+  let supabase;
+  try {
+    supabase = createAdminSupabaseClient();
+  } catch {
+    return;
+  }
   const rows = results.map((r) => ({
     service_key: r.key,
     day_utc: dayUtc,

@@ -168,6 +168,7 @@ export function SettingsView({
         created_at: null,
         updated_at: null,
       };
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- mirror server props when settings refresh
     setNotifEmail(b.notification_email ?? "");
     setEmailDown(b.email_on_down);
     setEmailRecovery(b.email_on_recovery);

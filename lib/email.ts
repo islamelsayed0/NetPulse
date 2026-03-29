@@ -120,7 +120,7 @@ export async function sendMonitorDownEmail(
   const html = shell(`Down: ${monitorName}`, header + body + footer);
 
   const from = getResendFrom();
-  const { error, data } = await resend.emails.send({
+  const { error } = await resend.emails.send({
     from,
     to: email.trim(),
     subject: `[NetPulse] Down: ${monitorName}`,
@@ -178,7 +178,7 @@ export async function sendMonitorRecoveryEmail(
   const html = shell(`Recovered: ${monitorName}`, header + body + footer);
 
   const from = getResendFrom();
-  const { error, data } = await resend.emails.send({
+  const { error } = await resend.emails.send({
     from,
     to: email.trim(),
     subject: `[NetPulse] Recovered: ${monitorName}`,
