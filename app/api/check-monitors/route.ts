@@ -5,7 +5,9 @@ import { checkRateLimit } from "@/lib/rate-limit";
 import { runAllMonitorChecks } from "@/lib/monitoring/run-all-checks";
 
 /**
- * Monitor checks (cron). On down/up transitions, `runAllMonitorChecks` loads
+ * Monitor checks (external cron, e.g. cron-job.org). Only POST is supported for
+ * schedulers; authenticate with header `x-cron-secret` (or Bearer) matching
+ * `CRON_SECRET`. On down/up transitions, `runAllMonitorChecks` loads
  * `user_settings` (notification_email, email_on_down, email_on_recovery) and
  * sends HTML alerts via `lib/email.ts` when enabled.
  */

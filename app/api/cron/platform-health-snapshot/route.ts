@@ -5,7 +5,7 @@ import { recordPlatformHealthDaily } from "@/lib/platform-health/record-snapshot
 
 /**
  * Hourly snapshot of platform health for the public 90-day heatmap.
- * Vercel Cron (GET) or manual call with CRON_SECRET.
+ * External scheduler (e.g. cron-job.org GET) or manual call with CRON_SECRET.
  */
 export async function OPTIONS(request: Request) {
   return corsPreflightResponse(request) ?? new NextResponse(null, { status: 204 });

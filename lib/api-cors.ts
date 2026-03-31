@@ -29,7 +29,7 @@ export function applyApiCors(
     response.headers.set("Vary", "Origin");
     response.headers.set(
       "Access-Control-Allow-Methods",
-      "GET, POST, OPTIONS"
+      "GET, POST, DELETE, OPTIONS"
     );
     response.headers.set(
       "Access-Control-Allow-Headers",

@@ -39,7 +39,10 @@ Server-only secrets must never use the `NEXT_PUBLIC_` prefix. The following belo
 - `CLERK_SECRET_KEY`
 - `SUPABASE_SERVICE_ROLE_KEY` or `SUPABASE_SECRET_KEY`
 - `CRON_SECRET`
+- `CRONJOB_API_KEY` (cron-job.org API key from [console.cron-job.org](https://console.cron-job.org/) → Settings; used only by `/api/cron/setup` to manage the external scheduler job—omit locally if you configure cron jobs manually)
 - `RESEND_API_KEY`
+
+**Vercel → Project → Settings → Environment Variables:** add the same server-only variables for Production (and Preview if you use preview deployments). Include `CRON_SECRET` and, if you use the setup route or automation, `CRONJOB_API_KEY`. Optional: `NETPULSE_CRON_MONITOR_URL` if your production check URL is not the default `https://netpulse-rose.vercel.app/api/check-monitors`.
 
 For production deployments, set `NEXT_PUBLIC_SITE_URL` to the canonical origin (metadata, sitemap, Open Graph). On Vercel, `VERCEL_URL` is used when the public site URL is unset.
 
@@ -69,12 +72,20 @@ npm start
 
 ## Scheduled monitor checks
 
-External schedulers should send:
+Scheduling uses [cron-job.org](https://cron-job.org) (or any HTTP client), not Vercel Cron. External schedulers should send:
 
 ```http
 POST /api/check-monitors
 x-cron-secret: <value of CRON_SECRET>
 ```
+
+**Programmatic setup:** with `CRONJOB_API_KEY` and `CRON_SECRET` configured on the server, you can call:
+
+- `GET /api/cron/setup` — check whether the NetPulse job exists on cron-job.org (same `x-cron-secret` or `Authorization: Bearer` as `CRON_SECRET`)
+- `POST /api/cron/setup` — create a job targeting `https://netpulse-rose.vercel.app/api/check-monitors` every minute (UTC) with the `x-cron-secret` header set from `CRON_SECRET`
+- `DELETE /api/cron/setup` — remove that job from cron-job.org
+
+The hourly platform health snapshot (`GET /api/cron/platform-health-snapshot` with the same secret headers) is not created by that endpoint; add a separate cron-job.org job if you still want the public heatmap updated every hour.
 
 Further detail is documented in [CRON_SETUP.md](CRON_SETUP.md).
 
