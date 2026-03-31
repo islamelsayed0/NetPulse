@@ -141,10 +141,44 @@ function liveToHeatmapStatus(
 }
 
 export async function loadPlatformStatusPageData(): Promise<PlatformStatusPageData> {
+  // #region agent log
+  fetch("http://127.0.0.1:7838/ingest/1763dc2b-6641-47a8-a74d-209daff78414", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "X-Debug-Session-Id": "5c64e3",
+    },
+    body: JSON.stringify({
+      sessionId: "5c64e3",
+      location: "platform-status-page.ts:loadPlatformStatusPageData",
+      message: "load enter",
+      data: {},
+      timestamp: Date.now(),
+      hypothesisId: "H3",
+    }),
+  }).catch(() => {});
+  // #endregion
   const generatedAtIso = new Date().toISOString();
   let checkResults: PlatformCheckResult[] = [];
   try {
     checkResults = await runAllPlatformChecks();
+    // #region agent log
+    fetch("http://127.0.0.1:7838/ingest/1763dc2b-6641-47a8-a74d-209daff78414", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Debug-Session-Id": "5c64e3",
+      },
+      body: JSON.stringify({
+        sessionId: "5c64e3",
+        location: "platform-status-page.ts:loadPlatformStatusPageData",
+        message: "checks ok",
+        data: { n: checkResults.length },
+        timestamp: Date.now(),
+        hypothesisId: "H3",
+      }),
+    }).catch(() => {});
+    // #endregion
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     console.error("loadPlatformStatusPageData checks", msg);

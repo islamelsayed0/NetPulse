@@ -33,7 +33,7 @@ export async function GET(request: Request) {
   const res = NextResponse.json(
     {
       ok: true,
-      status: "up",
+      status: "operational",
       latencyMs,
       checkedAt,
       detail: null,

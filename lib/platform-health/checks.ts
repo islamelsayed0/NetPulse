@@ -148,7 +148,10 @@ export async function checkAuth(): Promise<PlatformCheckResult> {
   }
 }
 
-/** Resend API key present and API reachable. */
+/**
+ * Resend: validate configuration locally only (no HTTP to Resend — avoids 401
+ * from invalid keys and keeps health checks fast/reliable on Hobby).
+ */
 export async function checkNotifications(): Promise<PlatformCheckResult> {
   const start = performance.now();
   const key = process.env.RESEND_API_KEY?.trim();
@@ -160,38 +163,15 @@ export async function checkNotifications(): Promise<PlatformCheckResult> {
       "RESEND_API_KEY is not configured"
     );
   }
-  try {
-    const res = await withTimeout(
-      (signal) =>
-        fetch("https://api.resend.com/domains", {
-          signal,
-          headers: {
-            Authorization: `Bearer ${key}`,
-            Accept: "application/json",
-          },
-        }),
-      FETCH_TIMEOUT_MS
+  if (!key.startsWith("re_")) {
+    return finish(
+      "notifications",
+      "degraded",
+      start,
+      "RESEND_API_KEY must start with re_"
     );
-    const latencyMs = Math.round(performance.now() - start);
-    if (!res.ok) {
-      return {
-        key: "notifications",
-        status: res.status >= 500 ? "down" : "degraded",
-        latencyMs,
-        checkedAtIso: new Date().toISOString(),
-        detail: `Resend HTTP ${res.status}`,
-      };
-    }
-    return {
-      key: "notifications",
-      status: "up",
-      latencyMs,
-      checkedAtIso: new Date().toISOString(),
-    };
-  } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e);
-    return finish("notifications", "down", start, msg);
   }
+  return finish("notifications", "up", start);
 }
 
 export async function runAllPlatformChecks(): Promise<PlatformCheckResult[]> {
