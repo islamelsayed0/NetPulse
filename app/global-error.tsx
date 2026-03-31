@@ -12,27 +12,6 @@ export default function GlobalError({
 }) {
   useEffect(() => {
     console.error(error);
-    // #region agent log
-    fetch("http://127.0.0.1:7838/ingest/1763dc2b-6641-47a8-a74d-209daff78414", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-Debug-Session-Id": "5c64e3",
-      },
-      body: JSON.stringify({
-        sessionId: "5c64e3",
-        location: "global-error.tsx",
-        message: "global error boundary",
-        data: {
-          name: error?.name,
-          digest: error?.digest,
-          msgLen: error?.message?.length ?? 0,
-        },
-        timestamp: Date.now(),
-        hypothesisId: "H4",
-      }),
-    }).catch(() => {});
-    // #endregion
   }, [error]);
 
   return (

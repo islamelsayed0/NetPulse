@@ -65,23 +65,6 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  // #region agent log
-  fetch("http://127.0.0.1:7838/ingest/1763dc2b-6641-47a8-a74d-209daff78414", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "X-Debug-Session-Id": "5c64e3",
-    },
-    body: JSON.stringify({
-      sessionId: "5c64e3",
-      location: "layout.tsx:RootLayout",
-      message: "root layout render",
-      data: { siteLen: site.length },
-      timestamp: Date.now(),
-      hypothesisId: "H2",
-    }),
-  }).catch(() => {});
-  // #endregion
   return (
     <html
       lang="en"

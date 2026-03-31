@@ -111,23 +111,6 @@ function IconAlertBubble() {
 }
 
 export default function HomePage() {
-  // #region agent log
-  fetch("http://127.0.0.1:7838/ingest/1763dc2b-6641-47a8-a74d-209daff78414", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "X-Debug-Session-Id": "5c64e3",
-    },
-    body: JSON.stringify({
-      sessionId: "5c64e3",
-      location: "page.tsx:HomePage",
-      message: "home render",
-      data: {},
-      timestamp: Date.now(),
-      hypothesisId: "H5",
-    }),
-  }).catch(() => {});
-  // #endregion
   return (
     <div className="flex min-h-screen flex-col bg-carbon-page text-carbon-body antialiased">
       <MarketingHeader />

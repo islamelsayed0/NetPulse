@@ -2,15 +2,15 @@ import { NextResponse } from "next/server";
 import type { PlatformCheckResult } from "./types";
 
 export function jsonHealthResponse(result: PlatformCheckResult): NextResponse {
-  const down = result.status === "down";
+  const healthy = result.status === "up";
   return NextResponse.json(
     {
-      ok: !down,
+      ok: healthy,
       status: result.status,
       latencyMs: result.latencyMs,
       checkedAt: result.checkedAtIso,
       detail: result.detail ?? null,
     },
-    { status: down ? 503 : 200 }
+    { status: healthy ? 200 : 503 }
   );
 }

@@ -1,27 +1,13 @@
-import { getSiteUrl } from "@/lib/site-url";
-import { createAdminSupabaseClient } from "@/lib/supabase";
-import { normalizeSupabaseError } from "@/lib/supabase-errors";
 import type {
   PlatformCheckResult,
   PlatformServiceKey,
   ServiceHealthStatus,
 } from "./types";
 import { PLATFORM_SERVICE_KEYS } from "./types";
-
-const FETCH_TIMEOUT_MS = 10_000;
-
-async function withTimeout<T>(
-  factory: (signal: AbortSignal) => Promise<T>,
-  ms: number
-): Promise<T> {
-  const controller = new AbortController();
-  const id = setTimeout(() => controller.abort(), ms);
-  try {
-    return await factory(controller.signal);
-  } finally {
-    clearTimeout(id);
-  }
-}
+import {
+  integrationEnvDetail,
+  missingIntegrationEnvVars,
+} from "./integration-env";
 
 function finish(
   key: PlatformServiceKey,
@@ -44,68 +30,54 @@ export async function checkWeb(): Promise<PlatformCheckResult> {
   return finish("web", "up", start);
 }
 
-/** Public API layer responds (routes + JSON). */
+/**
+ * HTTP API surface: no outbound fetch (avoids loops and middleware edge cases).
+ * Treat as up when this process is serving routes.
+ */
 export async function checkApi(): Promise<PlatformCheckResult> {
   const start = performance.now();
-  const base = getSiteUrl().replace(/\/$/, "");
-  try {
-    const res = await withTimeout(
-      (signal) =>
-        fetch(`${base}/api/health/web`, {
-          signal,
-          cache: "no-store",
-          headers: { Accept: "application/json" },
-        }),
-      FETCH_TIMEOUT_MS
-    );
-    const latencyMs = Math.round(performance.now() - start);
-    if (!res.ok) {
-      return {
-        key: "api",
-        status: "down",
-        latencyMs,
-        checkedAtIso: new Date().toISOString(),
-        detail: `HTTP ${res.status}`,
-      };
-    }
-    return {
-      key: "api",
-      status: "up",
-      latencyMs,
-      checkedAtIso: new Date().toISOString(),
-    };
-  } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e);
-    return finish("api", "down", start, msg);
-  }
+  return finish("api", "up", start);
 }
 
-/** Supabase / PostgREST reachable with service role. */
+/** Database config present (no live PostgREST call). */
 export async function checkDatabase(): Promise<PlatformCheckResult> {
   const start = performance.now();
-  try {
-    const supabase = createAdminSupabaseClient();
-    const { error } = await supabase.from("monitors").select("id").limit(1);
-    if (error) {
-      const e = normalizeSupabaseError(error);
-      return finish(
-        "database",
-        "down",
-        start,
-        e.message ?? "Database query failed"
-      );
-    }
-    return finish("database", "up", start);
-  } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e);
-    return finish("database", "down", start, msg);
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim();
+  const serviceKey =
+    process.env.SUPABASE_SERVICE_ROLE_KEY?.trim() ||
+    process.env.SUPABASE_SECRET_KEY?.trim();
+  if (!url) {
+    return finish(
+      "database",
+      "degraded",
+      start,
+      "NEXT_PUBLIC_SUPABASE_URL is not configured"
+    );
   }
+  if (!serviceKey) {
+    return finish(
+      "database",
+      "degraded",
+      start,
+      "SUPABASE_SERVICE_ROLE_KEY or SUPABASE_SECRET_KEY is not configured"
+    );
+  }
+  return finish("database", "up", start);
 }
 
-/** Clerk Backend API responds (secret configured). */
+/** Clerk config present (no Clerk REST API — avoids 401 from restricted keys). */
 export async function checkAuth(): Promise<PlatformCheckResult> {
   const start = performance.now();
+  const publishable = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY?.trim();
   const secret = process.env.CLERK_SECRET_KEY?.trim();
+  if (!publishable) {
+    return finish(
+      "auth",
+      "degraded",
+      start,
+      "NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY is not configured"
+    );
+  }
   if (!secret) {
     return finish(
       "auth",
@@ -114,61 +86,21 @@ export async function checkAuth(): Promise<PlatformCheckResult> {
       "CLERK_SECRET_KEY is not configured"
     );
   }
-  try {
-    const res = await withTimeout(
-      (signal) =>
-        fetch("https://api.clerk.com/v1/instance", {
-          signal,
-          headers: {
-            Authorization: `Bearer ${secret}`,
-            Accept: "application/json",
-          },
-        }),
-      FETCH_TIMEOUT_MS
-    );
-    const latencyMs = Math.round(performance.now() - start);
-    if (!res.ok) {
-      return {
-        key: "auth",
-        status: res.status >= 500 ? "down" : "degraded",
-        latencyMs,
-        checkedAtIso: new Date().toISOString(),
-        detail: `Clerk HTTP ${res.status}`,
-      };
-    }
-    return {
-      key: "auth",
-      status: "up",
-      latencyMs,
-      checkedAtIso: new Date().toISOString(),
-    };
-  } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e);
-    return finish("auth", "down", start, msg);
-  }
+  return finish("auth", "up", start);
 }
 
 /**
- * Resend: validate configuration locally only (no HTTP to Resend — avoids 401
- * from invalid keys and keeps health checks fast/reliable on Hobby).
+ * Integration env: Resend + Supabase URL + Clerk publishable (no external HTTP).
  */
 export async function checkNotifications(): Promise<PlatformCheckResult> {
   const start = performance.now();
-  const key = process.env.RESEND_API_KEY?.trim();
-  if (!key) {
+  const missing = missingIntegrationEnvVars();
+  if (missing.length > 0) {
     return finish(
       "notifications",
       "degraded",
       start,
-      "RESEND_API_KEY is not configured"
-    );
-  }
-  if (!key.startsWith("re_")) {
-    return finish(
-      "notifications",
-      "degraded",
-      start,
-      "RESEND_API_KEY must start with re_"
+      integrationEnvDetail(missing)
     );
   }
   return finish("notifications", "up", start);

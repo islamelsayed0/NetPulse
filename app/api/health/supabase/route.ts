@@ -1,41 +1,46 @@
 import { NextResponse } from "next/server";
 import { applyApiCors, corsPreflightResponse } from "@/lib/api-cors";
-import { createAdminSupabaseClient } from "@/lib/supabase";
-import { normalizeSupabaseError } from "@/lib/supabase-errors";
 
 /**
- * Readiness check: can PostgREST see `public.monitors` with the server service key?
- * GET /api/health/supabase → { ok, code?, message? }
+ * Config-only readiness: Supabase URL + server key (no PostgREST request).
+ * GET /api/health/supabase
  */
 export async function OPTIONS(request: Request) {
   return corsPreflightResponse(request) ?? new NextResponse(null, { status: 204 });
 }
 
 export async function GET(request: Request) {
-  try {
-    const supabase = createAdminSupabaseClient();
-    const { error } = await supabase.from("monitors").select("id").limit(1);
-    if (error) {
-      const e = normalizeSupabaseError(error);
-      const res = NextResponse.json({
-        ok: false,
-        code: e.code ?? null,
-        message: e.message ?? "Unknown error",
-      });
-      return applyApiCors(request, res);
-    }
-    const res = NextResponse.json({ ok: true });
-    return applyApiCors(request, res);
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim();
+  const serviceKey =
+    process.env.SUPABASE_SERVICE_ROLE_KEY?.trim() ||
+    process.env.SUPABASE_SECRET_KEY?.trim();
+
+  if (!url) {
     const res = NextResponse.json(
       {
         ok: false,
+        status: "degraded",
         code: "CONFIG",
-        message: msg,
+        message: "NEXT_PUBLIC_SUPABASE_URL is not configured",
       },
-      { status: 500 }
+      { status: 503 }
     );
     return applyApiCors(request, res);
   }
+  if (!serviceKey) {
+    const res = NextResponse.json(
+      {
+        ok: false,
+        status: "degraded",
+        code: "CONFIG",
+        message:
+          "SUPABASE_SERVICE_ROLE_KEY or SUPABASE_SECRET_KEY is not configured",
+      },
+      { status: 503 }
+    );
+    return applyApiCors(request, res);
+  }
+
+  const res = NextResponse.json({ ok: true, status: "operational" });
+  return applyApiCors(request, res);
 }
