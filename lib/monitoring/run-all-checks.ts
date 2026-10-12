@@ -8,6 +8,7 @@ import {
   notifyMonitorDown,
   notifyMonitorRecovered,
 } from "@/lib/notifications/monitor-notify";
+import { assertPublicHttpUrl } from "@/lib/monitoring/url-guard";
 import {
   createAdminSupabaseClient,
   type Monitor,
@@ -51,43 +52,102 @@ function formatOutageDuration(ms: number): string {
   return `${d} day${d === 1 ? "" : "s"}`;
 }
 
+const MAX_REDIRECT_HOPS = 5;
+
 /**
  * GET probe with timeout. Up = 2xx within latency budget; degraded = 2xx but slow; down otherwise.
+ *
+ * Redirects are followed manually (max 5 hops) and every hop, including the
+ * initial URL, is validated by assertPublicHttpUrl so a monitor can never be
+ * used to reach private networks or cloud metadata endpoints (SSRF guard).
  */
 export async function probeMonitorUrl(url: string): Promise<ProbeResult> {
   const controller = new AbortController();
   const t = setTimeout(() => controller.abort(), CHECK_TIMEOUT_MS);
   const started = Date.now();
   try {
-    const res = await fetch(url, {
-      method: "GET",
-      redirect: "follow",
-      signal: controller.signal,
-      headers: { "User-Agent": "NetPulse-Monitor/1.0" },
-    });
-    const responseTime = Date.now() - started;
-    const statusCode = res.status;
-    if (!res.ok) {
+    let current = url;
+    for (let hop = 0; hop <= MAX_REDIRECT_HOPS; hop++) {
+      try {
+        await assertPublicHttpUrl(current);
+      } catch (e) {
+        const reason = e instanceof Error ? e.message : "URL is not allowed";
+        return {
+          checkStatus: "down",
+          responseTime: Date.now() - started,
+          statusCode: null,
+          errorMessage: `Blocked target: ${reason}`,
+        };
+      }
+
+      const res = await fetch(current, {
+        method: "GET",
+        redirect: "manual",
+        signal: controller.signal,
+        headers: { "User-Agent": "NetPulse-Monitor/1.0" },
+      });
+      const responseTime = Date.now() - started;
+      const statusCode = res.status;
+
+      if (statusCode >= 300 && statusCode < 400) {
+        const location = res.headers.get("location");
+        if (!location) {
+          return {
+            checkStatus: "down",
+            responseTime,
+            statusCode,
+            errorMessage: `HTTP ${statusCode} redirect without Location header`,
+          };
+        }
+        if (hop === MAX_REDIRECT_HOPS) {
+          return {
+            checkStatus: "down",
+            responseTime,
+            statusCode,
+            errorMessage: `Too many redirects (more than ${MAX_REDIRECT_HOPS})`,
+          };
+        }
+        try {
+          current = new URL(location, current).toString();
+        } catch {
+          return {
+            checkStatus: "down",
+            responseTime,
+            statusCode,
+            errorMessage: `HTTP ${statusCode} redirect to an invalid Location`,
+          };
+        }
+        continue;
+      }
+
+      if (!res.ok) {
+        return {
+          checkStatus: "down",
+          responseTime,
+          statusCode,
+          errorMessage: `HTTP ${statusCode}`,
+        };
+      }
+      if (responseTime > DEGRADED_RESPONSE_MS) {
+        return {
+          checkStatus: "degraded",
+          responseTime,
+          statusCode,
+          errorMessage: null,
+        };
+      }
       return {
-        checkStatus: "down",
-        responseTime,
-        statusCode,
-        errorMessage: `HTTP ${statusCode}`,
-      };
-    }
-    if (responseTime > DEGRADED_RESPONSE_MS) {
-      return {
-        checkStatus: "degraded",
+        checkStatus: "up",
         responseTime,
         statusCode,
         errorMessage: null,
       };
     }
     return {
-      checkStatus: "up",
-      responseTime,
-      statusCode,
-      errorMessage: null,
+      checkStatus: "down",
+      responseTime: Date.now() - started,
+      statusCode: null,
+      errorMessage: `Too many redirects (more than ${MAX_REDIRECT_HOPS})`,
     };
   } catch (e) {
     const responseTime = Date.now() - started;

@@ -9,6 +9,7 @@ import type {
   MonitorRow,
 } from "@/lib/dashboard-types";
 import { INPUT_LIMITS } from "@/lib/constants";
+import { assertPublicHttpUrl } from "@/lib/monitoring/url-guard";
 import {
   sanitizeMonitorName,
   sanitizeMonitorUrlForStorage,
@@ -137,6 +138,7 @@ export async function insertMonitor(
   if (!name || !url) {
     throw new Error("Name and URL are required");
   }
+  await assertPublicHttpUrl(url);
   const insertRow: Record<string, unknown> = {
     user_id: userId,
     name,
@@ -439,6 +441,7 @@ export async function updateMonitorForUser(
   if (patch.url !== undefined) {
     const u = normalizeMonitorUrl(sanitizeMonitorUrlForStorage(patch.url));
     if (!u) throw new Error("URL is required");
+    await assertPublicHttpUrl(u);
     updates.url = u;
   }
   if (patch.type !== undefined) updates.type = patch.type;
