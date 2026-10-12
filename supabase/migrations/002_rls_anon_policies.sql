@@ -1,3 +1,7 @@
+-- SUPERSEDED by 009_revoke_anon_access.sql. Kept for history only.
+-- The anon grants and policies below are REVOKED by 009; do not re-apply them.
+-- Fresh installs should use supabase/NETPULSE_FULL_SETUP.sql (which omits them).
+--
 -- NetPulse RLS: permissive policies for `anon` (Clerk auth lives outside Supabase).
 --
 -- Service role / secret key (SUPABASE_SECRET_KEY or SUPABASE_SERVICE_ROLE_KEY):

@@ -26,7 +26,7 @@ NetPulse is an IT operations monitoring application for uptime tracking, inciden
 
 - Node.js 18 or newer
 - Clerk project (publishable and secret keys)
-- Supabase project (URL, anonymous key, and server-side service role or secret key)
+- Supabase project (URL and server-side service role or secret key; the anon key is not used)
 - Optional: Resend API key for transactional alert email
 
 ## Environment configuration
@@ -55,7 +55,7 @@ npm install
 cp .env.local.example .env.local
 ```
 
-Apply database migrations from `supabase/migrations/` in the Supabase SQL Editor (or your chosen migration workflow), then:
+Apply database migrations from `supabase/migrations/` in the Supabase SQL Editor (or your chosen migration workflow). For a fresh project you can run `supabase/NETPULSE_FULL_SETUP.sql` once instead. Existing projects must also run `009_revoke_anon_access.sql`. Then:
 
 ```bash
 npm run dev
@@ -69,6 +69,13 @@ The application listens at `http://localhost:3000` by default. Register or sign 
 npm run build
 npm start
 ```
+
+## Database security model
+
+- All database access is server side through the Supabase service role client (`createAdminSupabaseClient` in `lib/supabase.ts`). The service role bypasses row level security, so every query filters by the Clerk `user_id` in application code.
+- The public `anon` role and the `authenticated` role have no privileges on any NetPulse table or rollup function (`supabase/migrations/009_revoke_anon_access.sql`). Row level security stays enabled on every table with no permissive policies.
+- The browser never talks to Supabase directly. There is no anon or browser Supabase client in the codebase and `NEXT_PUBLIC_SUPABASE_ANON_KEY` is not required.
+- Monitor targets are validated against private, loopback, link local and cloud metadata address ranges before every probe and on create or update (`lib/monitoring/url-guard.ts`), so monitors cannot be used to reach internal infrastructure.
 
 ## Scheduled monitor checks
 

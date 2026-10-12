@@ -1,3 +1,5 @@
+-- NOTE: the anon GRANT and policy at the bottom of this file are SUPERSEDED by
+-- 009_revoke_anon_access.sql, which revokes them. Do not re-apply them.
 -- Per-user notification and alert preferences (Clerk user_id as text).
 -- Safe to re-run: IF NOT EXISTS / DROP POLICY IF EXISTS where supported.
 

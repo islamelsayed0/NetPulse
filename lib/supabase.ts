@@ -74,27 +74,13 @@ function requireEnv(name: string, value: string | undefined): string {
   return v;
 }
 
-/**
- * Public (anon) Supabase client. After `002_rls_anon_policies.sql`, RLS allows `anon` full
- * access to NetPulse tables (see migration WARNING). Prefer server-side
- * `createAdminSupabaseClient` for real app data; for strict multi-tenant DB security use
- * Clerk JWT with Supabase third-party auth and row policies on `user_id`.
+/*
+ * Security model: there is intentionally NO anon or browser Supabase client.
+ * Migration 009_revoke_anon_access.sql revokes every privilege the `anon` and
+ * `authenticated` roles had on NetPulse tables. All database access happens on
+ * the server through the service role client below and is filtered by the Clerk
+ * user_id in application code.
  */
-export function createPublicSupabaseClient(): SupabaseClient {
-  const url = requireEnv("NEXT_PUBLIC_SUPABASE_URL", process.env.NEXT_PUBLIC_SUPABASE_URL);
-  const anonKey = requireEnv(
-    "NEXT_PUBLIC_SUPABASE_ANON_KEY",
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-  );
-  return createClient(url, anonKey);
-}
-
-/**
- * Browser Supabase client (alias). Prefer `createPublicSupabaseClient`.
- */
-export function createBrowserClient(): SupabaseClient {
-  return createPublicSupabaseClient();
-}
 
 /**
  * Service-role admin client for server-only use. Bypasses RLS; always filter by Clerk `user_id` yourself.
